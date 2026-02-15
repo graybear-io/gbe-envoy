@@ -20,6 +20,3 @@ Thumbs.db
 
 # Claude Code
 .claude/settings.local.json
-
-# Beads state cache
-.beads/export-state/
