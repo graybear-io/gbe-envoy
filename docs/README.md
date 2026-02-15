@@ -1,6 +1,6 @@
 # GBE User Documentation
 
-User-facing documentation for GBE (GBE Builds Everything).
+User-facing documentation for GBE (GrayBear Ecumene).
 
 ## Status
 

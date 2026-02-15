@@ -1,10 +1,10 @@
-# GBE - GBE Builds Everything
+# GBE Envoy - GrayBear Ecumene
 
 **A universal tool composition platform with multiple interfaces.**
 
 GBE is a substrate for composing Unix tools and commands through multiple interfaces: traditional shell (text), AI (natural language), GUI (drag-n-drop), and visual programming (flow diagrams).
 
-> *GBE Builds Everything* - A recursive acronym in the spirit of GNU (GNU's Not Unix)
+> *GrayBear Ecumene* - the whole inhabited world of composable tools
 
 ## Project Vision
 

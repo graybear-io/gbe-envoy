@@ -450,14 +450,14 @@ GBE combines:
 
 No single existing tool does all of this.
 
-## The Name: GBE Builds Everything
+## The Name: GrayBear Ecumene
 
-Recursive acronym in the spirit of GNU (GNU's Not Unix).
-Captures the essence of composing tools to build anything.
+From Greek *oikoumene* — the whole inhabited world.
+GBE is an ecosystem of composable tools and roles.
 
-The recursive nature reflects the core concept:
+The name reflects the core concept:
 tools pipe into chains, chains pipe into tools,
-infinitely composable—building everything from small parts.
+infinitely composable — an inhabited world of small parts.
 
 ## Design Evolution
 
