@@ -120,7 +120,7 @@ fn main() -> Result<()> {
 
     info!("Adapter shutdown complete");
 
-    Ok(())
+    std::process::exit(exit_status.code().unwrap_or(1));
 }
 
 /// Handle data streaming to subscribers
