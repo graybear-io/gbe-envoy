@@ -493,4 +493,86 @@ mod tests {
         // Should have 1 subscriber
         assert_eq!(state.subscriber_count(&source), 1);
     }
+
+    #[test]
+    fn test_get_connection_missing() {
+        let state = RouterState::new();
+        assert!(state.get_connection(&"nonexistent".to_string()).is_none());
+    }
+
+    #[test]
+    fn test_list_tools_empty() {
+        let state = RouterState::new();
+        assert!(state.list_tools().is_empty());
+    }
+
+    #[test]
+    fn test_list_tools_multiple() {
+        let state = RouterState::new();
+        state.register_connection("t1".into(), "addr1".into(), vec!["cap1".into()]);
+        state.register_connection("t2".into(), "addr2".into(), vec!["cap2".into()]);
+        let tools = state.list_tools();
+        assert_eq!(tools.len(), 2);
+        let ids: Vec<&str> = tools.iter().map(|t| t.tool_id.as_str()).collect();
+        assert!(ids.contains(&"t1"));
+        assert!(ids.contains(&"t2"));
+    }
+
+    #[test]
+    fn test_proxy_address_missing() {
+        let state = RouterState::new();
+        assert!(state.get_proxy_address(&"none".to_string()).is_none());
+    }
+
+    #[test]
+    fn test_has_proxy_false() {
+        let state = RouterState::new();
+        assert!(!state.has_proxy(&"none".to_string()));
+    }
+
+    #[test]
+    fn test_subscriber_count_zero() {
+        let state = RouterState::new();
+        assert_eq!(state.subscriber_count(&"no-source".to_string()), 0);
+    }
+
+    #[test]
+    fn test_unregister_cleans_source_subscriptions() {
+        let state = RouterState::new();
+        let source = "src".to_string();
+        let sub = "sub".to_string();
+        state.register_connection(source.clone(), "addr".into(), vec![]);
+        state.add_subscription(&source, sub.clone());
+        assert_eq!(state.subscriber_count(&source), 1);
+
+        // Unregister the source tool — its subscription list should be removed
+        state.unregister_connection(&source);
+        assert_eq!(state.subscriber_count(&source), 0);
+    }
+
+    #[test]
+    fn test_unregister_removes_from_all_subscription_lists() {
+        let state = RouterState::new();
+        let src1 = "src1".to_string();
+        let src2 = "src2".to_string();
+        let sub = "sub".to_string();
+
+        state.add_subscription(&src1, sub.clone());
+        state.add_subscription(&src2, sub.clone());
+        assert_eq!(state.subscriber_count(&src1), 1);
+        assert_eq!(state.subscriber_count(&src2), 1);
+
+        state.unregister_connection(&sub);
+        assert_eq!(state.subscriber_count(&src1), 0);
+        assert_eq!(state.subscriber_count(&src2), 0);
+    }
+
+    #[test]
+    fn test_sequential_tool_ids() {
+        let state = RouterState::new();
+        let ids: Vec<ToolId> = (0..5).map(|_| state.assign_tool_id()).collect();
+        // All unique
+        let unique: std::collections::HashSet<_> = ids.iter().collect();
+        assert_eq!(unique.len(), 5);
+    }
 }
