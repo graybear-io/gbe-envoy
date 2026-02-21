@@ -114,7 +114,7 @@ fn main() -> Result<()> {
             tool_id
         }
         msg => {
-            anyhow::bail!("Expected ConnectAck, got {:?}", msg);
+            anyhow::bail!("Expected ConnectAck, got {msg:?}");
         }
     };
 
@@ -134,10 +134,10 @@ fn main() -> Result<()> {
             data_connect_address
         }
         ControlMessage::Error { code, message } => {
-            anyhow::bail!("Subscription failed: {} - {}", code, message);
+            anyhow::bail!("Subscription failed: {code} - {message}");
         }
         msg => {
-            anyhow::bail!("Expected SubscribeAck or Error, got {:?}", msg);
+            anyhow::bail!("Expected SubscribeAck or Error, got {msg:?}");
         }
     };
 
@@ -235,7 +235,7 @@ where
             let list = List::new(visible_lines).block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(format!("GBE Client - Lines: {}", total_lines)),
+                    .title(format!("GBE Client - Lines: {total_lines}")),
             );
 
             f.render_widget(list, chunks[0]);

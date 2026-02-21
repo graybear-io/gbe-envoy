@@ -1,6 +1,6 @@
 //! Automated end-to-end test
 //!
-//! Usage: cargo run --package gbe-adapter --example automated_e2e
+//! Usage: cargo run --package gbe-adapter --example `automated_e2e`
 //!
 //! This will:
 //! 1. Start router in background
@@ -98,7 +98,7 @@ impl AdapterProcess {
             let pid_str = String::from_utf8_lossy(&output.stdout);
             if let Some(pid_line) = pid_str.lines().next() {
                 if let Ok(pid) = pid_line.trim().parse::<u32>() {
-                    return Ok(format!("{}-001", pid));
+                    return Ok(format!("{pid}-001"));
                 }
             }
         }
@@ -130,7 +130,7 @@ fn main() -> Result<()> {
     let adapter_tool_id =
         AdapterProcess::discover_tool_id().context("Failed to discover adapter ToolId")?;
 
-    println!("✓ Discovered adapter ToolId: {}", adapter_tool_id);
+    println!("✓ Discovered adapter ToolId: {adapter_tool_id}");
 
     // Connect to router as subscriber
     println!("\nConnecting to router as subscriber...");
@@ -145,7 +145,7 @@ fn main() -> Result<()> {
         capabilities: vec![],
     };
     let json = serde_json::to_string(&connect)?;
-    writeln!(router_writer, "{}", json)?;
+    writeln!(router_writer, "{json}")?;
     router_writer.flush()?;
 
     // Receive ConnectAck
@@ -155,12 +155,12 @@ fn main() -> Result<()> {
     println!("✓ Subscriber connected");
 
     // Subscribe to adapter
-    println!("\nSubscribing to adapter {}...", adapter_tool_id);
+    println!("\nSubscribing to adapter {adapter_tool_id}...");
     let subscribe = ControlMessage::Subscribe {
         target: adapter_tool_id.clone(),
     };
     let json = serde_json::to_string(&subscribe)?;
-    writeln!(router_writer, "{}", json)?;
+    writeln!(router_writer, "{json}")?;
     router_writer.flush()?;
 
     // Receive SubscribeAck
@@ -177,9 +177,9 @@ fn main() -> Result<()> {
             data_connect_address
         }
         ControlMessage::Error { code, message } => {
-            anyhow::bail!("Subscription failed: {} - {}", code, message);
+            anyhow::bail!("Subscription failed: {code} - {message}");
         }
-        msg => anyhow::bail!("Expected SubscribeAck, got {:?}", msg),
+        msg => anyhow::bail!("Expected SubscribeAck, got {msg:?}"),
     };
 
     // Connect to data channel
@@ -205,7 +205,7 @@ fn main() -> Result<()> {
         match DataFrame::read_from(&mut data_stream) {
             Ok(frame) => {
                 let payload = String::from_utf8_lossy(&frame.payload);
-                print!("{}", payload);
+                print!("{payload}");
                 lines.push(payload.trim().to_string());
                 frames.push(frame);
             }
@@ -219,7 +219,7 @@ fn main() -> Result<()> {
                 {
                     break;
                 }
-                anyhow::bail!("Error reading frame: {}", e);
+                anyhow::bail!("Error reading frame: {e}");
             }
         }
     }
@@ -232,12 +232,12 @@ fn main() -> Result<()> {
 
     let expected = vec!["1", "2", "3", "4", "5"];
     if lines == expected {
-        println!("✓ Output matches expected: {:?}", expected);
+        println!("✓ Output matches expected: {expected:?}");
         println!("\n🎉 END-TO-END TEST PASSED!");
     } else {
         println!("✗ Output mismatch");
-        println!("  Expected: {:?}", expected);
-        println!("  Received: {:?}", lines);
+        println!("  Expected: {expected:?}");
+        println!("  Received: {lines:?}");
         anyhow::bail!("Test failed");
     }
 

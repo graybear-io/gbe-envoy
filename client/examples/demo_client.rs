@@ -6,7 +6,7 @@
 //! Usage:
 //! 1. Start router: cargo run --package gbe-router
 //! 2. Start adapter: cargo run --package gbe-adapter -- seq 1 10
-//! 3. Run this: cargo run --package gbe-client --example demo_client
+//! 3. Run this: cargo run --package gbe-client --example `demo_client`
 
 use anyhow::{Context, Result};
 use gbe_protocol::{ControlMessage, DataFrame};
@@ -19,7 +19,7 @@ fn main() -> Result<()> {
 
     // Connect to router
     let router_socket = "/tmp/gbe-router.sock";
-    println!("Connecting to router at {}...", router_socket);
+    println!("Connecting to router at {router_socket}...");
 
     let stream = UnixStream::connect(router_socket)
         .context("Failed to connect to router. Is the router running?")?;
@@ -37,16 +37,16 @@ fn main() -> Result<()> {
     let response = recv_message(&mut control_reader)?;
     let _tool_id = match response {
         ControlMessage::ConnectAck { tool_id, .. } => {
-            println!("✓ Connected! ToolId: {}", tool_id);
+            println!("✓ Connected! ToolId: {tool_id}");
             tool_id
         }
-        msg => anyhow::bail!("Expected ConnectAck, got {:?}", msg),
+        msg => anyhow::bail!("Expected ConnectAck, got {msg:?}"),
     };
 
     // Discover adapter ToolId
     println!("\nDiscovering adapter...");
     let adapter_id = discover_adapter_id()?;
-    println!("✓ Found adapter: {}", adapter_id);
+    println!("✓ Found adapter: {adapter_id}");
 
     // Subscribe to adapter
     println!("\nSubscribing to adapter...");
@@ -60,13 +60,13 @@ fn main() -> Result<()> {
             data_connect_address,
             ..
         } => {
-            println!("✓ Subscribed! Data address: {}", data_connect_address);
+            println!("✓ Subscribed! Data address: {data_connect_address}");
             data_connect_address
         }
         ControlMessage::Error { code, message } => {
-            anyhow::bail!("Subscription failed: {} - {}", code, message);
+            anyhow::bail!("Subscription failed: {code} - {message}");
         }
-        msg => anyhow::bail!("Expected SubscribeAck, got {:?}", msg),
+        msg => anyhow::bail!("Expected SubscribeAck, got {msg:?}"),
     };
 
     // Connect to data stream
@@ -96,7 +96,7 @@ fn main() -> Result<()> {
                 }
             }
             Err(e) => {
-                println!("\n✓ Data stream closed: {}", e);
+                println!("\n✓ Data stream closed: {e}");
                 break;
             }
         }
@@ -114,7 +114,7 @@ fn main() -> Result<()> {
 fn send_message(writer: &mut UnixStream, msg: &ControlMessage) -> Result<()> {
     use std::io::Write;
     let json = serde_json::to_string(msg)?;
-    writeln!(writer, "{}", json)?;
+    writeln!(writer, "{json}")?;
     writer.flush()?;
     Ok(())
 }
@@ -134,7 +134,7 @@ fn discover_adapter_id() -> Result<String> {
         let pid_str = String::from_utf8_lossy(&output.stdout);
         if let Some(pid_line) = pid_str.lines().next() {
             if let Ok(pid) = pid_line.trim().parse::<u32>() {
-                return Ok(format!("{}-001", pid));
+                return Ok(format!("{pid}-001"));
             }
         }
     }

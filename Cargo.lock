@@ -598,13 +598,8 @@ dependencies = [
 name = "gbe-buffer"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "criterion",
- "gbe-protocol",
- "serde_json",
  "thiserror 1.0.69",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -638,9 +633,6 @@ dependencies = [
  "anyhow",
  "clap",
  "gbe-protocol",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
  "tracing",
  "tracing-subscriber",
 ]

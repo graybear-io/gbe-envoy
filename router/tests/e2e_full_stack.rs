@@ -24,7 +24,7 @@ struct TestProcess {
 
 impl TestProcess {
     fn start(name: &str, bin_path: &str, args: &[&str]) -> Result<Self> {
-        println!("Starting {} from {}...", name, bin_path);
+        println!("Starting {name} from {bin_path}...");
 
         let mut cmd = Command::new(bin_path);
         cmd.args(args);
@@ -33,7 +33,7 @@ impl TestProcess {
         cmd.stdout(std::process::Stdio::inherit());
         cmd.stderr(std::process::Stdio::inherit());
 
-        let child = cmd.spawn().context(format!("Failed to start {}", name))?;
+        let child = cmd.spawn().context(format!("Failed to start {name}"))?;
 
         Ok(Self {
             child,
@@ -90,8 +90,8 @@ fn discover_adapter_id() -> Result<String> {
         let pid_str = String::from_utf8_lossy(&output.stdout);
         if let Some(pid_line) = pid_str.lines().next() {
             if let Ok(pid) = pid_line.trim().parse::<u32>() {
-                let tool_id = format!("{}-001", pid);
-                println!("✓ Adapter ToolId: {}", tool_id);
+                let tool_id = format!("{pid}-001");
+                println!("✓ Adapter ToolId: {tool_id}");
                 return Ok(tool_id);
             }
         }
@@ -112,14 +112,14 @@ fn connect_client(target: &str) -> Result<(RouterConnection, UnixStream)> {
 
     let _tool_id = match router_conn.recv()? {
         ControlMessage::ConnectAck { tool_id, .. } => {
-            println!("✓ Client ToolId: {}", tool_id);
+            println!("✓ Client ToolId: {tool_id}");
             tool_id
         }
-        msg => anyhow::bail!("Expected ConnectAck, got {:?}", msg),
+        msg => anyhow::bail!("Expected ConnectAck, got {msg:?}"),
     };
 
     // Subscribe
-    println!("Subscribing to target: {}", target);
+    println!("Subscribing to target: {target}");
     router_conn.send(&ControlMessage::Subscribe {
         target: target.to_string(),
     })?;
@@ -129,13 +129,13 @@ fn connect_client(target: &str) -> Result<(RouterConnection, UnixStream)> {
             data_connect_address,
             ..
         } => {
-            println!("✓ Data address: {}", data_connect_address);
+            println!("✓ Data address: {data_connect_address}");
             data_connect_address
         }
         ControlMessage::Error { code, message } => {
-            anyhow::bail!("Subscribe failed: {} - {}", code, message);
+            anyhow::bail!("Subscribe failed: {code} - {message}");
         }
-        msg => anyhow::bail!("Expected SubscribeAck, got {:?}", msg),
+        msg => anyhow::bail!("Expected SubscribeAck, got {msg:?}"),
     };
 
     // Connect to data stream
@@ -150,35 +150,32 @@ fn connect_client(target: &str) -> Result<(RouterConnection, UnixStream)> {
     Ok((router_conn, data_stream))
 }
 
-fn read_data_frames(mut stream: UnixStream, expected_count: usize) -> Result<Vec<String>> {
-    println!("\nReading data frames (expecting {})...", expected_count);
+fn read_data_frames(mut stream: UnixStream, expected_count: usize) -> Vec<String> {
+    println!("\nReading data frames (expecting {expected_count})...");
 
     let mut lines = Vec::new();
     let mut count = 0;
 
     loop {
-        match DataFrame::read_from(&mut stream) {
-            Ok(frame) => {
-                if let Ok(line) = String::from_utf8(frame.payload) {
-                    let trimmed = line.trim();
-                    println!("  [{}] {}", frame.seq, trimmed);
-                    lines.push(trimmed.to_string());
-                    count += 1;
+        if let Ok(frame) = DataFrame::read_from(&mut stream) {
+            if let Ok(line) = String::from_utf8(frame.payload) {
+                let trimmed = line.trim();
+                println!("  [{}] {}", frame.seq, trimmed);
+                lines.push(trimmed.to_string());
+                count += 1;
 
-                    if count >= expected_count {
-                        println!("✓ Received {} lines", count);
-                        break;
-                    }
+                if count >= expected_count {
+                    println!("✓ Received {count} lines");
+                    break;
                 }
             }
-            Err(_) => {
-                println!("✓ Stream closed after {} lines", count);
-                break;
-            }
+        } else {
+            println!("✓ Stream closed after {count} lines");
+            break;
         }
     }
 
-    Ok(lines)
+    lines
 }
 
 struct RouterConnection {
@@ -197,7 +194,7 @@ impl RouterConnection {
     fn send(&mut self, msg: &ControlMessage) -> Result<()> {
         use std::io::Write;
         let json = serde_json::to_string(msg)?;
-        writeln!(self.writer, "{}", json)?;
+        writeln!(self.writer, "{json}")?;
         self.writer.flush()?;
         Ok(())
     }
@@ -210,7 +207,7 @@ impl RouterConnection {
 }
 
 #[test]
-#[ignore] // Requires pre-built binaries; runs in CI via `just test`
+#[ignore = "requires pre-built binaries; runs in CI via just test"]
 fn test_full_stack_integration() -> Result<()> {
     println!("\n=== GBE Full Stack E2E Test ===\n");
 
@@ -224,8 +221,8 @@ fn test_full_stack_integration() -> Result<()> {
     let adapter_bin = std::env::var("CARGO_BIN_EXE_gbe-adapter")
         .unwrap_or_else(|_| "../target/debug/gbe-adapter".to_string());
 
-    println!("Using router binary: {}", router_bin);
-    println!("Using adapter binary: {}", adapter_bin);
+    println!("Using router binary: {router_bin}");
+    println!("Using adapter binary: {adapter_bin}");
 
     // Start router
     let router = TestProcess::start("router", &router_bin, &[])?;
@@ -242,7 +239,7 @@ fn test_full_stack_integration() -> Result<()> {
 
     // Connect client and read data
     let (mut router_conn, data_stream) = connect_client(&adapter_id)?;
-    let lines = read_data_frames(data_stream, 10)?;
+    let lines = read_data_frames(data_stream, 10);
 
     // Verify output
     println!("\nVerifying output...");
@@ -250,7 +247,7 @@ fn test_full_stack_integration() -> Result<()> {
 
     for (i, line) in lines.iter().enumerate() {
         let expected = (i + 1).to_string();
-        assert_eq!(line, &expected, "Line {} should be {}", i, expected);
+        assert_eq!(line, &expected, "Line {i} should be {expected}");
     }
 
     println!("✓ All lines correct");

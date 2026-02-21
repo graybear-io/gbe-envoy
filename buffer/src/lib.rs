@@ -1,12 +1,12 @@
 //! GBE Buffer - Storage layer for rope and ring buffers
 //!
 //! Provides two buffer types:
-//! - **RopeBuffer**: Seekable, mutable storage for file editing
-//! - **RingBuffer**: Fixed-size, append-only storage for streams
+//! - **`RopeBuffer`**: Seekable, mutable storage for file editing
+//! - **`RingBuffer`**: Fixed-size, append-only storage for streams
 //!
 //! # Examples
 //!
-//! ## RopeBuffer (for files)
+//! ## `RopeBuffer` (for files)
 //!
 //! ```
 //! use gbe_buffer::RopeBuffer;
@@ -17,7 +17,7 @@
 //! buf.delete(6..13);          // "hello world"
 //! ```
 //!
-//! ## RingBuffer (for streams)
+//! ## `RingBuffer` (for streams)
 //!
 //! ```
 //! use gbe_buffer::{RingBuffer, ViewWindow};
@@ -51,6 +51,7 @@ pub struct ViewWindow {
 
 impl ViewWindow {
     /// Create a new view window
+    #[must_use]
     pub fn new(start_line: usize, count: usize) -> Self {
         Self { start_line, count }
     }

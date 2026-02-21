@@ -17,6 +17,12 @@
 //! // Automatic cleanup on drop
 //! ```
 
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::unnecessary_wraps,
+    clippy::unused_self
+)]
+
 use anyhow::{Context, Result};
 use gbe_protocol::ControlMessage;
 use std::io::{BufRead, BufReader, Write};
@@ -49,7 +55,7 @@ impl TestEnv {
     pub fn new() -> Result<Self> {
         let id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
         let pid = std::process::id();
-        let router_socket = format!("/tmp/gbe-test-{}-{}.sock", pid, id);
+        let router_socket = format!("/tmp/gbe-test-{pid}-{id}.sock");
 
         // Clean up any existing socket
         let _ = std::fs::remove_file(&router_socket);
@@ -64,7 +70,7 @@ impl TestEnv {
 
     /// Start the GBE router process
     ///
-    /// Returns a RouterHandle for interacting with the router.
+    /// Returns a `RouterHandle` for interacting with the router.
     pub fn start_router(&mut self) -> Result<RouterHandle> {
         let router_bin = get_binary_path("gbe-router")?;
 
@@ -73,7 +79,7 @@ impl TestEnv {
             .stdout(std::process::Stdio::inherit())
             .stderr(std::process::Stdio::inherit())
             .spawn()
-            .context(format!("Failed to start router from {}", router_bin))?;
+            .context(format!("Failed to start router from {router_bin}"))?;
 
         let pid = child.id();
         self.router = Some(child);
@@ -99,7 +105,7 @@ impl TestEnv {
             .stdout(std::process::Stdio::inherit())
             .stderr(std::process::Stdio::inherit())
             .spawn()
-            .context(format!("Failed to start adapter from {}", adapter_bin))?;
+            .context(format!("Failed to start adapter from {adapter_bin}"))?;
 
         let pid = child.id();
 
@@ -130,7 +136,7 @@ impl TestEnv {
             }
             thread::sleep(Duration::from_millis(10));
             if i == 49 {
-                anyhow::bail!("Socket {} not created after 500ms", socket_path);
+                anyhow::bail!("Socket {socket_path} not created after 500ms");
             }
         }
         Ok(())
@@ -168,7 +174,7 @@ impl ClientConnection {
     /// Send a control message to the router
     pub fn send(&mut self, msg: &ControlMessage) -> Result<()> {
         let json = serde_json::to_string(msg)?;
-        writeln!(self.writer, "{}", json)?;
+        writeln!(self.writer, "{json}")?;
         self.writer.flush()?;
         Ok(())
     }
@@ -223,8 +229,8 @@ fn get_binary_path(name: &str) -> Result<String> {
     path.push(name);
 
     path.canonicalize()
-        .context(format!("Binary {} not found at {:?}", name, path))?
+        .context(format!("Binary {name} not found at {}", path.display()))?
         .to_str()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .context("Invalid path encoding")
 }

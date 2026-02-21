@@ -12,7 +12,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    /// Create a new connection from a UnixStream
+    /// Create a new connection from a `UnixStream`
     pub fn new(stream: UnixStream) -> Self {
         let writer = stream.try_clone().expect("Failed to clone stream");
         let reader = BufReader::new(stream);
@@ -42,7 +42,7 @@ impl Connection {
     pub fn send_message(&mut self, msg: &ControlMessage) -> Result<()> {
         let json = serde_json::to_string(msg).context("Failed to serialize control message")?;
 
-        writeln!(self.writer, "{}", json).context("Failed to write to socket")?;
+        writeln!(self.writer, "{json}").context("Failed to write to socket")?;
 
         self.writer.flush().context("Failed to flush socket")?;
 

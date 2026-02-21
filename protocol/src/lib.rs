@@ -158,22 +158,38 @@ pub struct ToolInfo {
 }
 
 impl ControlMessage {
-    /// Serialize to JSON string
+    /// Serialize to JSON string.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProtocolError::Json` if serialization fails.
     pub fn to_json(&self) -> Result<String, ProtocolError> {
         Ok(serde_json::to_string(self)?)
     }
 
-    /// Deserialize from JSON string
+    /// Deserialize from JSON string.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProtocolError::Json` if deserialization fails.
     pub fn from_json(json: &str) -> Result<Self, ProtocolError> {
         Ok(serde_json::from_str(json)?)
     }
 
-    /// Serialize to JSON bytes
+    /// Serialize to JSON bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProtocolError::Json` if serialization fails.
     pub fn to_json_bytes(&self) -> Result<Vec<u8>, ProtocolError> {
         Ok(serde_json::to_vec(self)?)
     }
 
-    /// Deserialize from JSON bytes
+    /// Deserialize from JSON bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProtocolError::Json` if deserialization fails.
     pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, ProtocolError> {
         Ok(serde_json::from_slice(bytes)?)
     }
@@ -195,12 +211,15 @@ pub struct DataFrame {
 
 impl DataFrame {
     /// Create a new data frame
+    #[must_use]
     pub fn new(seq: u64, payload: Vec<u8>) -> Self {
         Self { seq, payload }
     }
 
     /// Serialize to wire format: [u32: length][u64: seq][bytes: payload]
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
+        #[allow(clippy::cast_possible_truncation)] // frames are bounded well below u32::MAX
         let len = self.payload.len() as u32;
         let mut bytes = Vec::with_capacity(4 + 8 + self.payload.len());
 
@@ -216,14 +235,22 @@ impl DataFrame {
         bytes
     }
 
-    /// Write frame to a writer
+    /// Write frame to a writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProtocolError::Io` on write failure.
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), ProtocolError> {
         let bytes = self.to_bytes();
         writer.write_all(&bytes)?;
         Ok(())
     }
 
-    /// Read frame from a reader
+    /// Read frame from a reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProtocolError::Io` on read failure or `InvalidFrame` on bad data.
     pub fn read_from<R: Read>(reader: &mut R) -> Result<Self, ProtocolError> {
         // Read length (u32)
         let mut len_buf = [0u8; 4];
@@ -242,7 +269,11 @@ impl DataFrame {
         Ok(Self { seq, payload })
     }
 
-    /// Deserialize from bytes (for testing/convenience)
+    /// Deserialize from bytes (for testing/convenience).
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProtocolError::InvalidFrame` if the frame is malformed.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ProtocolError> {
         if bytes.len() < 12 {
             return Err(ProtocolError::InvalidFrame(format!(

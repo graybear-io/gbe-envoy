@@ -1,6 +1,6 @@
 //! Test client for gbe-router
 //!
-//! Run this with: cargo run --package gbe-router --example test_client
+//! Run this with: cargo run --package gbe-router --example `test_client`
 
 use anyhow::Result;
 use gbe_protocol::ControlMessage;
@@ -21,7 +21,7 @@ fn main() -> Result<()> {
         capabilities: vec!["pty".to_string(), "color".to_string()],
     };
     let json = serde_json::to_string(&connect)?;
-    writeln!(writer, "{}", json)?;
+    writeln!(writer, "{json}")?;
     writer.flush()?;
 
     // Receive ConnectAck
@@ -35,18 +35,18 @@ fn main() -> Result<()> {
             data_listen_address,
         } => {
             println!("✓ Received ConnectAck:");
-            println!("  Tool ID: {}", tool_id);
-            println!("  Data address: {}", data_listen_address);
+            println!("  Tool ID: {tool_id}");
+            println!("  Data address: {data_listen_address}");
         }
         msg => {
-            println!("✗ Unexpected message: {:?}", msg);
+            println!("✗ Unexpected message: {msg:?}");
         }
     }
 
     println!("\nSending Disconnect...");
     let disconnect = ControlMessage::Disconnect;
     let json = serde_json::to_string(&disconnect)?;
-    writeln!(writer, "{}", json)?;
+    writeln!(writer, "{json}")?;
     writer.flush()?;
 
     println!("✓ Test complete!");

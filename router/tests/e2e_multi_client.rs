@@ -25,7 +25,7 @@ struct TestProcess {
 
 impl TestProcess {
     fn start(name: &str, bin_path: &str, args: &[&str]) -> Result<Self> {
-        println!("Starting {} from {}...", name, bin_path);
+        println!("Starting {name} from {bin_path}...");
 
         let mut cmd = Command::new(bin_path);
         cmd.args(args);
@@ -34,7 +34,7 @@ impl TestProcess {
         cmd.stdout(std::process::Stdio::inherit());
         cmd.stderr(std::process::Stdio::inherit());
 
-        let child = cmd.spawn().context(format!("Failed to start {}", name))?;
+        let child = cmd.spawn().context(format!("Failed to start {name}"))?;
 
         Ok(Self {
             child,
@@ -65,8 +65,8 @@ fn wait_for_router(socket_path: &str) -> Result<()> {
 
 fn get_adapter_id(router_pid: u32) -> String {
     // Adapter ToolId is always {router_pid}-001 (first tool to connect)
-    let tool_id = format!("{}-001", router_pid);
-    println!("✓ Adapter ToolId: {}", tool_id);
+    let tool_id = format!("{router_pid}-001");
+    println!("✓ Adapter ToolId: {tool_id}");
     tool_id
 }
 
@@ -86,7 +86,7 @@ impl RouterConnection {
     fn send(&mut self, msg: &ControlMessage) -> Result<()> {
         use std::io::Write;
         let json = serde_json::to_string(msg)?;
-        writeln!(self.writer, "{}", json)?;
+        writeln!(self.writer, "{json}")?;
         self.writer.flush()?;
         Ok(())
     }
@@ -103,7 +103,7 @@ fn connect_client(
     socket_path: &str,
     target: &str,
 ) -> Result<(RouterConnection, UnixStream)> {
-    println!("\n{} connecting to router...", name);
+    println!("\n{name} connecting to router...");
 
     let mut router_conn = RouterConnection::connect(socket_path)?;
 
@@ -114,14 +114,14 @@ fn connect_client(
 
     let _tool_id = match router_conn.recv()? {
         ControlMessage::ConnectAck { tool_id, .. } => {
-            println!("✓ {} ToolId: {}", name, tool_id);
+            println!("✓ {name} ToolId: {tool_id}");
             tool_id
         }
-        msg => anyhow::bail!("Expected ConnectAck, got {:?}", msg),
+        msg => anyhow::bail!("Expected ConnectAck, got {msg:?}"),
     };
 
     // Subscribe
-    println!("{} subscribing to target: {}", name, target);
+    println!("{name} subscribing to target: {target}");
     router_conn.send(&ControlMessage::Subscribe {
         target: target.to_string(),
     })?;
@@ -131,13 +131,13 @@ fn connect_client(
             data_connect_address,
             ..
         } => {
-            println!("✓ {} data address: {}", name, data_connect_address);
+            println!("✓ {name} data address: {data_connect_address}");
             data_connect_address
         }
         ControlMessage::Error { code, message } => {
-            anyhow::bail!("Subscribe failed: {} - {}", code, message);
+            anyhow::bail!("Subscribe failed: {code} - {message}");
         }
-        msg => anyhow::bail!("Expected SubscribeAck, got {:?}", msg),
+        msg => anyhow::bail!("Expected SubscribeAck, got {msg:?}"),
     };
 
     // Connect to data stream
@@ -145,9 +145,9 @@ fn connect_client(
         .strip_prefix("unix://")
         .context("Invalid data address")?;
 
-    println!("{} connecting to data stream...", name);
+    println!("{name} connecting to data stream...");
     let data_stream = UnixStream::connect(socket_path)?;
-    println!("✓ {} data stream connected", name);
+    println!("✓ {name} data stream connected");
 
     Ok((router_conn, data_stream))
 }
@@ -157,10 +157,7 @@ fn read_data_frames(
     mut stream: UnixStream,
     expected_count: usize,
 ) -> Result<Vec<String>> {
-    println!(
-        "\n{} reading data frames (expecting {})...",
-        name, expected_count
-    );
+    println!("\n{name} reading data frames (expecting {expected_count})...");
 
     let mut lines = Vec::new();
     let mut count = 0;
@@ -178,7 +175,7 @@ fn read_data_frames(
                     count += 1;
 
                     if count >= expected_count {
-                        println!("✓ {} received {} lines", name, count);
+                        println!("✓ {name} received {count} lines");
                         break;
                     }
                 }
@@ -192,7 +189,7 @@ fn read_data_frames(
                     || err_str.contains("Unexpected end")
                     || err_str.contains("failed to fill whole buffer")
                 {
-                    println!("✓ {} stream closed after {} lines", name, count);
+                    println!("✓ {name} stream closed after {count} lines");
                     break;
                 }
                 return Err(e.into());
@@ -204,7 +201,7 @@ fn read_data_frames(
 }
 
 #[test]
-#[ignore] // Requires pre-built binaries; runs in CI via `just test`
+#[ignore = "requires pre-built binaries; runs in CI via just test"]
 fn test_multi_client_proxy() -> Result<()> {
     println!("\n=== GBE Multi-Client E2E Test ===\n");
 
@@ -218,14 +215,14 @@ fn test_multi_client_proxy() -> Result<()> {
     let adapter_bin = std::env::var("CARGO_BIN_EXE_gbe-adapter")
         .unwrap_or_else(|_| "../target/debug/gbe-adapter".to_string());
 
-    println!("Using router binary: {}", router_bin);
-    println!("Using adapter binary: {}", adapter_bin);
-    println!("Using socket: {}", socket_path);
+    println!("Using router binary: {router_bin}");
+    println!("Using adapter binary: {adapter_bin}");
+    println!("Using socket: {socket_path}");
 
     // Start router with unique socket
     let router = TestProcess::start("router", &router_bin, &["--socket", &socket_path])?;
     let router_pid = router.child.id();
-    println!("Router started (PID: {})", router_pid);
+    println!("Router started (PID: {router_pid})");
     wait_for_router(&socket_path)?;
 
     // Start adapter with a longer-running command (100 lines with delay)
@@ -283,8 +280,8 @@ fn test_multi_client_proxy() -> Result<()> {
 
     let expected = vec!["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
-    println!("Client1 received: {:?}", lines1);
-    println!("Client2 received: {:?}", lines2);
+    println!("Client1 received: {lines1:?}");
+    println!("Client2 received: {lines2:?}");
 
     // Both clients should receive the same data
     assert_eq!(
@@ -325,7 +322,7 @@ fn test_multi_client_proxy() -> Result<()> {
 }
 
 #[test]
-#[ignore] // Requires pre-built binaries; runs in CI via `just test`
+#[ignore = "requires pre-built binaries; runs in CI via just test"]
 fn test_subscribe_to_dead_tool() -> Result<()> {
     println!("\n=== GBE Subscribe to Dead Tool Test ===\n");
 
@@ -339,14 +336,14 @@ fn test_subscribe_to_dead_tool() -> Result<()> {
     let adapter_bin = std::env::var("CARGO_BIN_EXE_gbe-adapter")
         .unwrap_or_else(|_| "../target/debug/gbe-adapter".to_string());
 
-    println!("Using router binary: {}", router_bin);
-    println!("Using adapter binary: {}", adapter_bin);
-    println!("Using socket: {}", socket_path);
+    println!("Using router binary: {router_bin}");
+    println!("Using adapter binary: {adapter_bin}");
+    println!("Using socket: {socket_path}");
 
     // Start router with unique socket
     let router = TestProcess::start("router", &router_bin, &["--socket", &socket_path])?;
     let router_pid = router.child.id();
-    println!("Router started (PID: {})", router_pid);
+    println!("Router started (PID: {router_pid})");
     wait_for_router(&socket_path)?;
 
     // Get adapter ToolId from router PID (before starting adapter)
@@ -372,7 +369,7 @@ fn test_subscribe_to_dead_tool() -> Result<()> {
     thread::sleep(Duration::from_millis(200));
 
     // Poll router until tool disconnects (with timeout)
-    println!("Polling router until tool {} disconnects...", adapter_id);
+    println!("Polling router until tool {adapter_id} disconnects...");
     let mut disconnected = false;
     for i in 0..50 {
         // 5 seconds max
@@ -389,14 +386,14 @@ fn test_subscribe_to_dead_tool() -> Result<()> {
                     break;
                 }
             }
-            msg => anyhow::bail!("Expected ToolsResponse, got {:?}", msg),
+            msg => anyhow::bail!("Expected ToolsResponse, got {msg:?}"),
         }
 
         thread::sleep(Duration::from_millis(100));
     }
 
     if !disconnected {
-        anyhow::bail!("Tool {} did not disconnect after 5s", adapter_id);
+        anyhow::bail!("Tool {adapter_id} did not disconnect after 5s");
     }
 
     // Try to subscribe to the dead tool
@@ -408,10 +405,10 @@ fn test_subscribe_to_dead_tool() -> Result<()> {
         Err(e) => {
             let err_msg = e.to_string();
             if err_msg.contains("NOT_FOUND") || err_msg.contains("not found") {
-                println!("✓ Expected error: {}", err_msg);
+                println!("✓ Expected error: {err_msg}");
                 println!("✓ Router correctly rejects subscription to dead tool");
             } else {
-                anyhow::bail!("Unexpected error: {}", err_msg);
+                anyhow::bail!("Unexpected error: {err_msg}");
             }
         }
         Ok(_) => {

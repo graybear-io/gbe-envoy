@@ -15,6 +15,7 @@ pub struct RopeBuffer {
 
 impl RopeBuffer {
     /// Create a new empty rope buffer
+    #[must_use]
     pub fn new() -> Self {
         Self {
             content: String::new(),
@@ -22,6 +23,7 @@ impl RopeBuffer {
     }
 
     /// Create a rope buffer from initial content
+    #[must_use]
     pub fn with_content(content: &str) -> Self {
         Self {
             content: content.to_string(),
@@ -29,16 +31,22 @@ impl RopeBuffer {
     }
 
     /// Get the total length in bytes
+    #[must_use]
     pub fn len(&self) -> usize {
         self.content.len()
     }
 
     /// Check if buffer is empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.content.is_empty()
     }
 
-    /// Insert text at a position
+    /// Insert text at a position.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BufferError::OutOfBounds` if `pos` exceeds buffer length.
     pub fn insert(&mut self, pos: Position, text: &str) -> Result<(), BufferError> {
         if pos > self.content.len() {
             return Err(BufferError::OutOfBounds(pos));
@@ -48,7 +56,11 @@ impl RopeBuffer {
         Ok(())
     }
 
-    /// Delete a range of text
+    /// Delete a range of text.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BufferError` if the range is invalid or out of bounds.
     pub fn delete(&mut self, range: Range) -> Result<(), BufferError> {
         if range.start > range.end {
             return Err(BufferError::InvalidRange(range));
@@ -61,14 +73,22 @@ impl RopeBuffer {
         Ok(())
     }
 
-    /// Replace a range with new text
+    /// Replace a range with new text.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BufferError` if the range is invalid or out of bounds.
     pub fn replace(&mut self, range: Range, text: &str) -> Result<(), BufferError> {
         self.delete(range.clone())?;
         self.insert(range.start, text)?;
         Ok(())
     }
 
-    /// Get a slice of content
+    /// Get a slice of content.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BufferError` if the range is invalid or out of bounds.
     pub fn slice(&self, range: Range) -> Result<&str, BufferError> {
         if range.start > range.end {
             return Err(BufferError::InvalidRange(range.clone()));
@@ -81,21 +101,27 @@ impl RopeBuffer {
     }
 
     /// Get entire content
+    #[must_use]
     pub fn content(&self) -> &str {
         &self.content
     }
 
     /// Get a view window (line-based)
+    #[must_use]
     pub fn view(&self, window: ViewWindow) -> Vec<String> {
         let lines: Vec<&str> = self.content.lines().collect();
 
         let start = window.start_line.min(lines.len());
         let end = (window.start_line + window.count).min(lines.len());
 
-        lines[start..end].iter().map(|s| s.to_string()).collect()
+        lines[start..end]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect()
     }
 
     /// Get line count
+    #[must_use]
     pub fn line_count(&self) -> usize {
         if self.content.is_empty() {
             0
@@ -105,11 +131,16 @@ impl RopeBuffer {
     }
 
     /// Get a specific line (0-indexed)
+    #[must_use]
     pub fn line(&self, line_num: usize) -> Option<String> {
-        self.content.lines().nth(line_num).map(|s| s.to_string())
+        self.content
+            .lines()
+            .nth(line_num)
+            .map(std::string::ToString::to_string)
     }
 
     /// Find the byte position of a line
+    #[must_use]
     pub fn line_to_byte(&self, line_num: usize) -> Option<Position> {
         let mut pos = 0;
         for (idx, line) in self.content.lines().enumerate() {
@@ -122,6 +153,7 @@ impl RopeBuffer {
     }
 
     /// Find the line number of a byte position
+    #[must_use]
     pub fn byte_to_line(&self, pos: Position) -> Option<usize> {
         if pos > self.content.len() {
             return None;

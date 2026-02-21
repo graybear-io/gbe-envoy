@@ -26,7 +26,7 @@ impl RouterConnection {
     pub fn send(&mut self, msg: &ControlMessage) -> Result<()> {
         let json = serde_json::to_string(msg).context("Failed to serialize message")?;
 
-        writeln!(self.writer, "{}", json).context("Failed to write to router")?;
+        writeln!(self.writer, "{json}").context("Failed to write to router")?;
 
         self.writer.flush().context("Failed to flush")?;
 

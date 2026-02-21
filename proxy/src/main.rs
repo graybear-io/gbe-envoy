@@ -4,9 +4,9 @@
 //! data frames from one upstream to multiple downstream connections.
 //!
 //! Usage:
-//!   gbe-proxy --router unix:///tmp/gbe-router.sock \
-//!             --upstream unix:///tmp/gbe-12345-001.sock \
-//!             --listen unix:///tmp/gbe-proxy-56789.sock \
+//!   gbe-proxy --router <unix:///tmp/gbe-router.sock> \
+//!             --upstream <unix:///tmp/gbe-12345-001.sock> \
+//!             --listen <unix:///tmp/gbe-proxy-56789.sock> \
 //!             --mode framed
 
 use anyhow::{Context, Result};
@@ -50,7 +50,7 @@ struct ProxyState {
     /// Next downstream connection ID
     next_id: Arc<Mutex<u64>>,
 
-    /// Router control connection for FlowControl messages
+    /// Router control connection for `FlowControl` messages
     router_control: Arc<Mutex<Option<BufWriter<UnixStream>>>>,
 }
 
@@ -96,13 +96,13 @@ impl ProxyState {
     }
 
     /// Duplicate a frame to all downstream connections
-    fn broadcast_frame(&self, frame: &DataFrame) -> Result<()> {
+    fn broadcast_frame(&self, frame: &DataFrame) {
         let mut downstreams = self.downstreams.lock().unwrap();
         let mut failed_ids = Vec::new();
 
         for (id, writer) in downstreams.iter_mut() {
             match frame.write_to(writer) {
-                Ok(_) => {
+                Ok(()) => {
                     if let Err(e) = writer.flush() {
                         warn!("Failed to flush to downstream {}: {}", id, e);
                         failed_ids.push(*id);
@@ -120,11 +120,9 @@ impl ProxyState {
             downstreams.remove(&id);
             info!("Removed failed downstream {}", id);
         }
-
-        Ok(())
     }
 
-    /// Send FlowControl message to router (not implemented in Phase 1)
+    /// Send `FlowControl` message to router (not implemented in Phase 1)
     #[allow(dead_code)]
     fn send_flow_control(&self, status: &str) {
         let router = self.router_control.lock().unwrap();
@@ -223,9 +221,7 @@ fn main() -> Result<()> {
                 );
 
                 // Broadcast to all downstreams
-                if let Err(e) = state.broadcast_frame(&frame) {
-                    error!("Error broadcasting frame: {}", e);
-                }
+                state.broadcast_frame(&frame);
             }
             Err(e) => {
                 let err_str = e.to_string();

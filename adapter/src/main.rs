@@ -65,7 +65,7 @@ fn main() -> Result<()> {
             (tool_id, data_listen_address)
         }
         msg => {
-            anyhow::bail!("Expected ConnectAck, got {:?}", msg);
+            anyhow::bail!("Expected ConnectAck, got {msg:?}");
         }
     };
 
@@ -124,6 +124,7 @@ fn main() -> Result<()> {
 }
 
 /// Handle data streaming to subscribers
+#[allow(clippy::needless_pass_by_value)] // moved into thread::spawn
 fn handle_data_stream(
     listener: UnixListener,
     stdout: impl std::io::Read + Send + 'static,
@@ -175,7 +176,7 @@ fn handle_data_stream(
         for line in reader.lines() {
             match line {
                 Ok(line) => {
-                    let mut data = format!("[stderr] {}", line).into_bytes();
+                    let mut data = format!("[stderr] {line}").into_bytes();
                     data.push(b'\n');
 
                     let frame = DataFrame::new(stderr_seq.fetch_add(1, Ordering::SeqCst), data);

@@ -18,11 +18,14 @@ pub struct RingBuffer {
 }
 
 impl RingBuffer {
-    /// Create a new ring buffer with specified capacity (number of lines)
+    /// Create a new ring buffer with specified capacity (number of lines).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is zero.
+    #[must_use]
     pub fn new(capacity: usize) -> Self {
-        if capacity == 0 {
-            panic!("Ring buffer capacity must be > 0");
-        }
+        assert!(capacity != 0, "Ring buffer capacity must be > 0");
 
         Self {
             capacity,
@@ -32,26 +35,31 @@ impl RingBuffer {
     }
 
     /// Get the capacity
+    #[must_use]
     pub fn capacity(&self) -> usize {
         self.capacity
     }
 
     /// Get current number of lines stored
+    #[must_use]
     pub fn len(&self) -> usize {
         self.lines.len()
     }
 
     /// Check if buffer is empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.lines.is_empty()
     }
 
     /// Check if buffer is at capacity
+    #[must_use]
     pub fn is_full(&self) -> bool {
         self.lines.len() >= self.capacity
     }
 
     /// Get total lines ever pushed (including evicted ones)
+    #[must_use]
     pub fn total_pushed(&self) -> usize {
         self.total_pushed
     }
@@ -76,16 +84,19 @@ impl RingBuffer {
     }
 
     /// Get a specific line by index (0 = oldest line in buffer)
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&str> {
-        self.lines.get(index).map(|s| s.as_str())
+        self.lines.get(index).map(std::string::String::as_str)
     }
 
     /// Get all lines as a vector
+    #[must_use]
     pub fn lines(&self) -> Vec<String> {
         self.lines.iter().cloned().collect()
     }
 
     /// Get a view window of lines
+    #[must_use]
     pub fn view(&self, window: ViewWindow) -> Vec<String> {
         let start = window.start_line.min(self.lines.len());
         let end = (window.start_line + window.count).min(self.lines.len());
@@ -94,12 +105,14 @@ impl RingBuffer {
     }
 
     /// Get the last N lines
+    #[must_use]
     pub fn tail(&self, n: usize) -> Vec<String> {
         let start = self.lines.len().saturating_sub(n);
         self.lines.iter().skip(start).cloned().collect()
     }
 
     /// Get the first N lines
+    #[must_use]
     pub fn head(&self, n: usize) -> Vec<String> {
         self.lines.iter().take(n).cloned().collect()
     }
@@ -111,6 +124,7 @@ impl RingBuffer {
     }
 
     /// Search for lines containing a pattern
+    #[must_use]
     pub fn search(&self, pattern: &str) -> Vec<(usize, String)> {
         self.lines
             .iter()
@@ -121,20 +135,24 @@ impl RingBuffer {
     }
 
     /// Get the oldest line
+    #[must_use]
     pub fn oldest(&self) -> Option<&str> {
-        self.lines.front().map(|s| s.as_str())
+        self.lines.front().map(std::string::String::as_str)
     }
 
     /// Get the newest line
+    #[must_use]
     pub fn newest(&self) -> Option<&str> {
-        self.lines.back().map(|s| s.as_str())
+        self.lines.back().map(std::string::String::as_str)
     }
 
-    /// Resize the buffer capacity (may truncate if new capacity < current size)
+    /// Resize the buffer capacity (may truncate if new capacity < current size).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `new_capacity` is zero.
     pub fn resize(&mut self, new_capacity: usize) {
-        if new_capacity == 0 {
-            panic!("Ring buffer capacity must be > 0");
-        }
+        assert!(new_capacity != 0, "Ring buffer capacity must be > 0");
 
         self.capacity = new_capacity;
 
@@ -148,8 +166,12 @@ impl RingBuffer {
     }
 
     /// Get memory usage estimate (bytes)
+    #[must_use]
     pub fn memory_usage(&self) -> usize {
-        self.lines.iter().map(|s| s.len()).sum::<usize>()
+        self.lines
+            .iter()
+            .map(std::string::String::len)
+            .sum::<usize>()
             + self.lines.capacity() * std::mem::size_of::<String>()
     }
 }
@@ -170,7 +192,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "capacity must be > 0")]
     fn test_zero_capacity_panics() {
-        RingBuffer::new(0);
+        let _ = RingBuffer::new(0);
     }
 
     #[test]
@@ -237,7 +259,7 @@ mod tests {
     fn test_view_window() {
         let mut buf = RingBuffer::new(10);
         for i in 1..=5 {
-            buf.push(format!("line {}", i));
+            buf.push(format!("line {i}"));
         }
 
         let view = buf.view(ViewWindow::new(1, 2));
@@ -258,7 +280,7 @@ mod tests {
     fn test_tail() {
         let mut buf = RingBuffer::new(10);
         for i in 1..=5 {
-            buf.push(format!("line {}", i));
+            buf.push(format!("line {i}"));
         }
 
         let tail = buf.tail(2);
@@ -279,7 +301,7 @@ mod tests {
     fn test_head() {
         let mut buf = RingBuffer::new(10);
         for i in 1..=5 {
-            buf.push(format!("line {}", i));
+            buf.push(format!("line {i}"));
         }
 
         let head = buf.head(2);
@@ -331,7 +353,7 @@ mod tests {
     fn test_resize_smaller() {
         let mut buf = RingBuffer::new(5);
         for i in 1..=5 {
-            buf.push(format!("line {}", i));
+            buf.push(format!("line {i}"));
         }
 
         buf.resize(3);

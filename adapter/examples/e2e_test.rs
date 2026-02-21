@@ -3,7 +3,7 @@
 //! Run in 3 terminals:
 //! 1. cargo run --package gbe-router
 //! 2. cargo run --package gbe-adapter -- seq 1 5
-//! 3. cargo run --package gbe-adapter --example e2e_test
+//! 3. cargo run --package gbe-adapter --example `e2e_test`
 
 use anyhow::{Context, Result};
 use gbe_protocol::{ControlMessage, DataFrame};
@@ -26,7 +26,7 @@ fn main() -> Result<()> {
         capabilities: vec![],
     };
     let json = serde_json::to_string(&connect)?;
-    writeln!(router_writer, "{}", json)?;
+    writeln!(router_writer, "{json}")?;
     router_writer.flush()?;
 
     // Receive ConnectAck
@@ -36,10 +36,10 @@ fn main() -> Result<()> {
 
     let _my_tool_id = match ack {
         ControlMessage::ConnectAck { tool_id, .. } => {
-            println!("   ✓ My ToolId: {}", tool_id);
+            println!("   ✓ My ToolId: {tool_id}");
             tool_id
         }
-        msg => anyhow::bail!("Expected ConnectAck, got {:?}", msg),
+        msg => anyhow::bail!("Expected ConnectAck, got {msg:?}"),
     };
 
     // Ask user for target ToolId
@@ -53,12 +53,12 @@ fn main() -> Result<()> {
     let target_id = target_id.trim().to_string();
 
     // Subscribe to target
-    println!("\n3. Subscribing to {}...", target_id);
+    println!("\n3. Subscribing to {target_id}...");
     let subscribe = ControlMessage::Subscribe {
         target: target_id.clone(),
     };
     let json = serde_json::to_string(&subscribe)?;
-    writeln!(router_writer, "{}", json)?;
+    writeln!(router_writer, "{json}")?;
     router_writer.flush()?;
 
     // Receive SubscribeAck
@@ -71,13 +71,13 @@ fn main() -> Result<()> {
             data_connect_address,
             ..
         } => {
-            println!("   ✓ Data address: {}", data_connect_address);
+            println!("   ✓ Data address: {data_connect_address}");
             data_connect_address
         }
         ControlMessage::Error { code, message } => {
-            anyhow::bail!("Subscription failed: {} - {}", code, message);
+            anyhow::bail!("Subscription failed: {code} - {message}");
         }
-        msg => anyhow::bail!("Expected SubscribeAck, got {:?}", msg),
+        msg => anyhow::bail!("Expected SubscribeAck, got {msg:?}"),
     };
 
     // Connect to data channel
@@ -85,7 +85,7 @@ fn main() -> Result<()> {
         .strip_prefix("unix://")
         .context("Invalid data address")?;
 
-    println!("\n4. Connecting to data channel: {}...", socket_path);
+    println!("\n4. Connecting to data channel: {socket_path}...");
     let mut data_stream =
         UnixStream::connect(socket_path).context("Failed to connect to data channel")?;
 
@@ -101,20 +101,20 @@ fn main() -> Result<()> {
             Ok(frame) => {
                 frame_count += 1;
                 let payload = String::from_utf8_lossy(&frame.payload);
-                print!("{}", payload); // Already has newline
+                print!("{payload}"); // Already has newline
             }
             Err(e) => {
                 if e.to_string().contains("UnexpectedEof") || e.to_string().contains("EOF") {
                     break;
                 }
-                eprintln!("\nError reading frame: {}", e);
+                eprintln!("\nError reading frame: {e}");
                 break;
             }
         }
     }
 
     println!("---");
-    println!("\n✓ Received {} frames", frame_count);
+    println!("\n✓ Received {frame_count} frames");
     println!("✓ End-to-end test complete!");
 
     Ok(())

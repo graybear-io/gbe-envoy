@@ -30,16 +30,16 @@ struct Args {
 /// Router state shared across connections
 #[derive(Clone)]
 struct RouterState {
-    /// Next sequence number for ToolId assignment
+    /// Next sequence number for `ToolId` assignment
     next_seq: Arc<AtomicU64>,
 
-    /// Active connections: ToolId -> Connection info
+    /// Active connections: `ToolId` -> Connection info
     connections: Arc<Mutex<HashMap<ToolId, ConnectionInfo>>>,
 
-    /// Subscriptions: source ToolId -> list of subscriber ToolIds
+    /// Subscriptions: source `ToolId` -> list of subscriber `ToolIds`
     subscriptions: Arc<Mutex<HashMap<ToolId, Vec<ToolId>>>>,
 
-    /// Proxies: source ToolId -> ProxyInfo (spawned when multiple subscribers)
+    /// Proxies: source `ToolId` -> `ProxyInfo` (spawned when multiple subscribers)
     proxies: Arc<Mutex<HashMap<ToolId, ProxyInfo>>>,
 }
 
@@ -75,16 +75,16 @@ impl RouterState {
         }
     }
 
-    /// Assign a new ToolId in "PID-SEQ" format
+    /// Assign a new `ToolId` in "PID-SEQ" format
     fn assign_tool_id(&self) -> ToolId {
         let pid = process::id();
         let seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
-        format!("{}-{:03}", pid, seq)
+        format!("{pid}-{seq:03}")
     }
 
     /// Generate data listen address for a tool
-    fn assign_data_address(&self, tool_id: &str) -> String {
-        format!("unix:///tmp/gbe-{}.sock", tool_id)
+    fn assign_data_address(tool_id: &str) -> String {
+        format!("unix:///tmp/gbe-{tool_id}.sock")
     }
 
     /// Register a new connection
@@ -157,14 +157,14 @@ impl RouterState {
     /// Get subscriber count for a source
     fn subscriber_count(&self, source: &ToolId) -> usize {
         let subs = self.subscriptions.lock().unwrap();
-        subs.get(source).map(|v| v.len()).unwrap_or(0)
+        subs.get(source).map_or(0, std::vec::Vec::len)
     }
 
     /// Spawn a proxy subprocess for a source tool
     fn spawn_proxy(&self, source: &ToolId, upstream_address: &str) -> Result<String> {
         let pid = process::id();
         let proxy_seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
-        let proxy_listen = format!("unix:///tmp/gbe-proxy-{}-{:03}.sock", pid, proxy_seq);
+        let proxy_listen = format!("unix:///tmp/gbe-proxy-{pid}-{proxy_seq:03}.sock");
 
         // Remove socket if it exists
         let proxy_socket_path = proxy_listen.strip_prefix("unix://").unwrap();
@@ -192,7 +192,7 @@ impl RouterState {
             .arg("--mode")
             .arg("framed")
             .spawn()
-            .context(format!("Failed to spawn gbe-proxy from {}", proxy_bin))?;
+            .context(format!("Failed to spawn gbe-proxy from {proxy_bin}"))?;
 
         info!("✓ Proxy spawned (PID: {})", child.id());
 
@@ -279,142 +279,136 @@ fn main() -> Result<()> {
 }
 
 /// Handle a single tool connection
+#[allow(clippy::too_many_lines, clippy::needless_pass_by_value)] // moved into thread::spawn
 fn handle_connection(stream: UnixStream, state: RouterState) -> Result<()> {
     let mut conn = Connection::new(stream);
     let mut tool_id: Option<ToolId> = None;
 
     loop {
-        match conn.recv_message()? {
-            Some(msg) => {
-                debug!("Received: {:?}", msg);
+        if let Some(msg) = conn.recv_message()? {
+            debug!("Received: {:?}", msg);
 
-                let response = match msg {
-                    ControlMessage::Connect { capabilities } => {
-                        let tid = state.assign_tool_id();
-                        let data_addr = state.assign_data_address(&tid);
+            let response = match msg {
+                ControlMessage::Connect { capabilities } => {
+                    let tid = state.assign_tool_id();
+                    let data_addr = RouterState::assign_data_address(&tid);
 
-                        state.register_connection(tid.clone(), data_addr.clone(), capabilities);
+                    state.register_connection(tid.clone(), data_addr.clone(), capabilities);
 
-                        info!("Tool {} connected", tid);
-                        tool_id = Some(tid.clone());
+                    info!("Tool {} connected", tid);
+                    tool_id = Some(tid.clone());
 
-                        Some(ControlMessage::ConnectAck {
-                            tool_id: tid,
-                            data_listen_address: data_addr,
+                    Some(ControlMessage::ConnectAck {
+                        tool_id: tid,
+                        data_listen_address: data_addr,
+                    })
+                }
+
+                ControlMessage::Subscribe { target } => {
+                    let subscriber = tool_id.as_ref().context("Subscribe without Connect")?;
+
+                    if let Some(info) = state.get_connection(&target) {
+                        // Add subscription first
+                        state.add_subscription(&target, subscriber.clone());
+                        let sub_count = state.subscriber_count(&target);
+
+                        info!(
+                            "Tool {} subscribed to {} (total subscribers: {})",
+                            subscriber, target, sub_count
+                        );
+
+                        // Always use proxy for consistency (Phase 1 simplification)
+                        // This ensures all subscribers can receive data reliably
+                        let data_address =
+                            if let Some(proxy_addr) = state.get_proxy_address(&target) {
+                                info!("Using existing proxy at {}", proxy_addr);
+                                proxy_addr
+                            } else {
+                                info!("Spawning proxy for tool {}", target);
+                                match state.spawn_proxy(&target, &info.data_listen_address) {
+                                    Ok(proxy_addr) => {
+                                        info!("✓ Proxy ready at {}", proxy_addr);
+                                        proxy_addr
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to spawn proxy: {}", e);
+                                        // Fall back to direct address
+                                        warn!("Falling back to direct connection");
+                                        info.data_listen_address.clone()
+                                    }
+                                }
+                            };
+
+                        Some(ControlMessage::SubscribeAck {
+                            data_connect_address: data_address,
+                            capabilities: info.capabilities,
+                        })
+                    } else {
+                        warn!("Subscribe to unknown tool: {}", target);
+                        Some(ControlMessage::Error {
+                            code: "NOT_FOUND".to_string(),
+                            message: format!("Tool {target} not found"),
                         })
                     }
-
-                    ControlMessage::Subscribe { target } => {
-                        let subscriber = tool_id.as_ref().context("Subscribe without Connect")?;
-
-                        match state.get_connection(&target) {
-                            Some(info) => {
-                                // Add subscription first
-                                state.add_subscription(&target, subscriber.clone());
-                                let sub_count = state.subscriber_count(&target);
-
-                                info!(
-                                    "Tool {} subscribed to {} (total subscribers: {})",
-                                    subscriber, target, sub_count
-                                );
-
-                                // Always use proxy for consistency (Phase 1 simplification)
-                                // This ensures all subscribers can receive data reliably
-                                let data_address = if let Some(proxy_addr) =
-                                    state.get_proxy_address(&target)
-                                {
-                                    info!("Using existing proxy at {}", proxy_addr);
-                                    proxy_addr
-                                } else {
-                                    info!("Spawning proxy for tool {}", target);
-                                    match state.spawn_proxy(&target, &info.data_listen_address) {
-                                        Ok(proxy_addr) => {
-                                            info!("✓ Proxy ready at {}", proxy_addr);
-                                            proxy_addr
-                                        }
-                                        Err(e) => {
-                                            error!("Failed to spawn proxy: {}", e);
-                                            // Fall back to direct address
-                                            warn!("Falling back to direct connection");
-                                            info.data_listen_address.clone()
-                                        }
-                                    }
-                                };
-
-                                Some(ControlMessage::SubscribeAck {
-                                    data_connect_address: data_address,
-                                    capabilities: info.capabilities,
-                                })
-                            }
-                            None => {
-                                warn!("Subscribe to unknown tool: {}", target);
-                                Some(ControlMessage::Error {
-                                    code: "NOT_FOUND".to_string(),
-                                    message: format!("Tool {} not found", target),
-                                })
-                            }
-                        }
-                    }
-
-                    ControlMessage::Unsubscribe { target } => {
-                        let subscriber = tool_id.as_ref().context("Unsubscribe without Connect")?;
-
-                        info!("Tool {} unsubscribed from {}", subscriber, target);
-
-                        // TODO: implement unsubscribe tracking
-                        None
-                    }
-
-                    ControlMessage::QueryCapabilities { target } => {
-                        match state.get_connection(&target) {
-                            Some(info) => Some(ControlMessage::CapabilitiesResponse {
-                                capabilities: info.capabilities,
-                            }),
-                            None => Some(ControlMessage::Error {
-                                code: "NOT_FOUND".to_string(),
-                                message: format!("Tool {} not found", target),
-                            }),
-                        }
-                    }
-
-                    ControlMessage::QueryTools => {
-                        let tools = state.list_tools();
-                        info!("Query tools: {} connected", tools.len());
-                        Some(ControlMessage::ToolsResponse { tools })
-                    }
-
-                    ControlMessage::Disconnect => {
-                        if let Some(tid) = &tool_id {
-                            info!("Tool {} disconnected", tid);
-                            state.unregister_connection(tid);
-                        }
-                        break;
-                    }
-
-                    // These messages are sent by router, not received
-                    ControlMessage::ConnectAck { .. }
-                    | ControlMessage::SubscribeAck { .. }
-                    | ControlMessage::CapabilitiesResponse { .. }
-                    | ControlMessage::ToolsResponse { .. }
-                    | ControlMessage::Error { .. }
-                    | ControlMessage::FlowControl { .. } => {
-                        warn!("Received unexpected message type: {:?}", msg);
-                        None
-                    }
-                };
-
-                if let Some(resp) = response {
-                    conn.send_message(&resp)?;
                 }
-            }
-            None => {
-                // Connection closed
-                if let Some(tid) = tool_id {
-                    info!("Tool {} connection closed", tid);
-                    state.unregister_connection(&tid);
+
+                ControlMessage::Unsubscribe { target } => {
+                    let subscriber = tool_id.as_ref().context("Unsubscribe without Connect")?;
+
+                    info!("Tool {} unsubscribed from {}", subscriber, target);
+
+                    // TODO: implement unsubscribe tracking
+                    None
                 }
-                break;
+
+                ControlMessage::QueryCapabilities { target } => {
+                    match state.get_connection(&target) {
+                        Some(info) => Some(ControlMessage::CapabilitiesResponse {
+                            capabilities: info.capabilities,
+                        }),
+                        None => Some(ControlMessage::Error {
+                            code: "NOT_FOUND".to_string(),
+                            message: format!("Tool {target} not found"),
+                        }),
+                    }
+                }
+
+                ControlMessage::QueryTools => {
+                    let tools = state.list_tools();
+                    info!("Query tools: {} connected", tools.len());
+                    Some(ControlMessage::ToolsResponse { tools })
+                }
+
+                ControlMessage::Disconnect => {
+                    if let Some(tid) = &tool_id {
+                        info!("Tool {} disconnected", tid);
+                        state.unregister_connection(tid);
+                    }
+                    break;
+                }
+
+                // These messages are sent by router, not received
+                ControlMessage::ConnectAck { .. }
+                | ControlMessage::SubscribeAck { .. }
+                | ControlMessage::CapabilitiesResponse { .. }
+                | ControlMessage::ToolsResponse { .. }
+                | ControlMessage::Error { .. }
+                | ControlMessage::FlowControl { .. } => {
+                    warn!("Received unexpected message type: {:?}", msg);
+                    None
+                }
+            };
+
+            if let Some(resp) = response {
+                conn.send_message(&resp)?;
             }
+        } else {
+            // Connection closed
+            if let Some(tid) = tool_id {
+                info!("Tool {} connection closed", tid);
+                state.unregister_connection(&tid);
+            }
+            break;
         }
     }
 
@@ -451,9 +445,8 @@ mod tests {
 
     #[test]
     fn test_data_address_format() {
-        let state = RouterState::new();
         let id = "12345-001";
-        let addr = state.assign_data_address(id);
+        let addr = RouterState::assign_data_address(id);
 
         assert_eq!(addr, "unix:///tmp/gbe-12345-001.sock");
     }

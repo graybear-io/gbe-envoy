@@ -7,7 +7,7 @@ use gbe_protocol::ControlMessage;
 use test_harness::TestEnv;
 
 #[test]
-#[ignore] // Requires pre-built binaries; runs in CI via `just test`
+#[ignore = "requires pre-built binaries; runs in CI via just test"]
 fn test_connect_and_disconnect() -> Result<()> {
     let mut env = TestEnv::new()?;
     env.start_router()?;
@@ -27,7 +27,7 @@ fn test_connect_and_disconnect() -> Result<()> {
             assert!(tool_id.contains('-'));
             assert!(data_listen_address.starts_with("unix:///tmp/gbe-"));
         }
-        msg => panic!("Expected ConnectAck, got {:?}", msg),
+        msg => panic!("Expected ConnectAck, got {msg:?}"),
     }
 
     // Send Disconnect
@@ -37,7 +37,7 @@ fn test_connect_and_disconnect() -> Result<()> {
 }
 
 #[test]
-#[ignore] // Requires pre-built binaries; runs in CI via `just test`
+#[ignore = "requires pre-built binaries; runs in CI via just test"]
 fn test_subscribe_to_tool() -> Result<()> {
     let mut env = TestEnv::new()?;
     env.start_router()?;
@@ -50,7 +50,7 @@ fn test_subscribe_to_tool() -> Result<()> {
 
     let tool_a_id = match tool_a.recv()? {
         ControlMessage::ConnectAck { tool_id, .. } => tool_id,
-        msg => panic!("Expected ConnectAck, got {:?}", msg),
+        msg => panic!("Expected ConnectAck, got {msg:?}"),
     };
 
     // Tool B connects
@@ -75,14 +75,14 @@ fn test_subscribe_to_tool() -> Result<()> {
             assert!(data_connect_address.contains("gbe-proxy"));
             assert_eq!(capabilities.len(), 0);
         }
-        msg => panic!("Expected SubscribeAck, got {:?}", msg),
+        msg => panic!("Expected SubscribeAck, got {msg:?}"),
     }
 
     Ok(())
 }
 
 #[test]
-#[ignore] // Requires pre-built binaries; runs in CI via `just test`
+#[ignore = "requires pre-built binaries; runs in CI via just test"]
 fn test_subscribe_to_unknown_tool() -> Result<()> {
     let mut env = TestEnv::new()?;
     env.start_router()?;
@@ -105,14 +105,14 @@ fn test_subscribe_to_unknown_tool() -> Result<()> {
             assert_eq!(code, "NOT_FOUND");
             assert!(message.contains("not found"));
         }
-        msg => panic!("Expected Error, got {:?}", msg),
+        msg => panic!("Expected Error, got {msg:?}"),
     }
 
     Ok(())
 }
 
 #[test]
-#[ignore] // Requires pre-built binaries; runs in CI via `just test`
+#[ignore = "requires pre-built binaries; runs in CI via just test"]
 fn test_query_capabilities() -> Result<()> {
     let mut env = TestEnv::new()?;
     env.start_router()?;
@@ -125,7 +125,7 @@ fn test_query_capabilities() -> Result<()> {
 
     let tool_a_id = match tool_a.recv()? {
         ControlMessage::ConnectAck { tool_id, .. } => tool_id,
-        msg => panic!("Expected ConnectAck, got {:?}", msg),
+        msg => panic!("Expected ConnectAck, got {msg:?}"),
     };
 
     // Tool B queries A's capabilities
@@ -143,7 +143,7 @@ fn test_query_capabilities() -> Result<()> {
             assert!(capabilities.contains(&"pty".to_string()));
             assert!(capabilities.contains(&"color".to_string()));
         }
-        msg => panic!("Expected CapabilitiesResponse, got {:?}", msg),
+        msg => panic!("Expected CapabilitiesResponse, got {msg:?}"),
     }
 
     Ok(())
