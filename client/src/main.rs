@@ -83,79 +83,6 @@ impl App {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn make_app(lines: Vec<String>) -> App {
-        App::new(Arc::new(Mutex::new(lines)))
-    }
-
-    #[test]
-    fn new_app_starts_in_follow_mode() {
-        let app = make_app(vec![]);
-        assert!(app.follow_mode);
-        assert_eq!(app.scroll_offset, 0);
-        assert!(!app.should_quit);
-    }
-
-    #[test]
-    fn toggle_follow_mode() {
-        let mut app = make_app(vec![]);
-        assert!(app.follow_mode);
-        app.toggle_follow_mode();
-        assert!(!app.follow_mode);
-        app.toggle_follow_mode();
-        assert!(app.follow_mode);
-    }
-
-    #[test]
-    fn scroll_up_at_zero_is_noop() {
-        let mut app = make_app(vec![]);
-        app.scroll_up();
-        assert_eq!(app.scroll_offset, 0);
-        // follow_mode unchanged because offset was already 0
-        assert!(app.follow_mode);
-    }
-
-    #[test]
-    fn scroll_up_decrements_and_exits_follow() {
-        let mut app = make_app(vec![]);
-        app.scroll_offset = 5;
-        app.scroll_up();
-        assert_eq!(app.scroll_offset, 4);
-        assert!(!app.follow_mode);
-    }
-
-    #[test]
-    fn scroll_down_increments_and_exits_follow() {
-        let mut app = make_app(vec![]);
-        app.scroll_down();
-        assert_eq!(app.scroll_offset, 1);
-        assert!(!app.follow_mode);
-    }
-
-    #[test]
-    fn scroll_to_bottom_restores_follow() {
-        let mut app = make_app(vec![]);
-        app.scroll_offset = 10;
-        app.follow_mode = false;
-        app.scroll_to_bottom();
-        assert!(app.follow_mode);
-        assert_eq!(app.scroll_offset, 0);
-    }
-
-    #[test]
-    fn lines_shared_across_threads() {
-        let lines = Arc::new(Mutex::new(vec![]));
-        let app = App::new(lines.clone());
-        lines.lock().unwrap().push("hello".into());
-        let app_lines = app.lines.lock().unwrap();
-        assert_eq!(app_lines.len(), 1);
-        assert_eq!(app_lines[0], "hello");
-    }
-}
-
 fn main() -> Result<()> {
     let args = Args::parse();
 
@@ -374,4 +301,76 @@ where
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_app(lines: Vec<String>) -> App {
+        App::new(Arc::new(Mutex::new(lines)))
+    }
+
+    #[test]
+    fn new_app_starts_in_follow_mode() {
+        let app = make_app(vec![]);
+        assert!(app.follow_mode);
+        assert_eq!(app.scroll_offset, 0);
+        assert!(!app.should_quit);
+    }
+
+    #[test]
+    fn toggle_follow_mode() {
+        let mut app = make_app(vec![]);
+        assert!(app.follow_mode);
+        app.toggle_follow_mode();
+        assert!(!app.follow_mode);
+        app.toggle_follow_mode();
+        assert!(app.follow_mode);
+    }
+
+    #[test]
+    fn scroll_up_at_zero_is_noop() {
+        let mut app = make_app(vec![]);
+        app.scroll_up();
+        assert_eq!(app.scroll_offset, 0);
+        assert!(app.follow_mode);
+    }
+
+    #[test]
+    fn scroll_up_decrements_and_exits_follow() {
+        let mut app = make_app(vec![]);
+        app.scroll_offset = 5;
+        app.scroll_up();
+        assert_eq!(app.scroll_offset, 4);
+        assert!(!app.follow_mode);
+    }
+
+    #[test]
+    fn scroll_down_increments_and_exits_follow() {
+        let mut app = make_app(vec![]);
+        app.scroll_down();
+        assert_eq!(app.scroll_offset, 1);
+        assert!(!app.follow_mode);
+    }
+
+    #[test]
+    fn scroll_to_bottom_restores_follow() {
+        let mut app = make_app(vec![]);
+        app.scroll_offset = 10;
+        app.follow_mode = false;
+        app.scroll_to_bottom();
+        assert!(app.follow_mode);
+        assert_eq!(app.scroll_offset, 0);
+    }
+
+    #[test]
+    fn lines_shared_across_threads() {
+        let lines = Arc::new(Mutex::new(vec![]));
+        let app = App::new(lines.clone());
+        lines.lock().unwrap().push("hello".into());
+        let app_lines = app.lines.lock().unwrap();
+        assert_eq!(app_lines.len(), 1);
+        assert_eq!(app_lines[0], "hello");
+    }
 }
